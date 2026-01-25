@@ -37,7 +37,25 @@ export default [{
         // Standalone browser script (globals via <script> tags) – skip from repo lint
         'public/app.jsx',
     ],
-}, // Base JS recommended rules
+}, // Storybook config (TypeScript)
+    {
+        files: ['.storybook/**/*.{ts,tsx}'],
+        languageOptions: {
+            parser: tsParser,
+            parserOptions: {
+                // No need for type-aware linting here; just parse TS.
+                ecmaVersion: 'latest',
+                sourceType: 'module',
+            },
+            globals: {
+                ...globals.node,
+            },
+        },
+        rules: {
+            // Storybook config often uses devDependencies and tooling patterns.
+            'no-undef': 'off',
+        },
+    }, // Base JS recommended rules
     js.configs.recommended, // Node services/routes (JS)
     {
         files: ['src/**/*.{js,jsx}'],
