@@ -10,4 +10,4 @@ pnpm install
 
 ## Running
 
-By default the server starts on http://localhost:3000 and serves the UI at `/`.
+By default the server starts on http://localhost:3021 and serves the UI at `/`.
