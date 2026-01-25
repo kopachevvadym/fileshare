@@ -24,7 +24,7 @@ export function safeReadMessages() {
         if (!raw.trim()) return [];
         const parsed = JSON.parse(raw);
         return Array.isArray(parsed) ? parsed : [];
-    } catch (_) {
+    } catch {
         // If the file is corrupted, don't crash the server.
         return [];
     }
