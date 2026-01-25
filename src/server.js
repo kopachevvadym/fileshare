@@ -1,6 +1,6 @@
 const express = require('express');
-const fileRoutes = require('./src/files/files.route');
-const messageRoutes = require('./src/messages/messages.route');
+const fileRoutes = require('./files/files.route');
+const messageRoutes = require('./messages/messages.route');
 const path = require('path');
 
 const PORT = 3021;
