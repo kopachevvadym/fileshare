@@ -1,0 +1,27 @@
+{
+  "name": "@vamspace/fileshare",
+  "version": "1.0.0",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "lint": "eslint . --ext .js",
+    "lint:fix": "eslint . --ext .js --fix",
+    "format": "prettier --write \"**/*.{js,json,html}\"",
+    "test": "jest"
+  },
+  "keywords": [],
+  "author": "Vam",
+  "description": "",
+  "devDependencies": {
+    "eslint": "^9.29.0",
+    "jest": "^29.7.0",
+    "prettier": "^3.5.3",
+    "nodemon": "^3.1.11"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "multer": "^2.0.1"
+  },
+  "packageManager": "pnpm@10.28.1+sha512.7d7dbbca9e99447b7c3bf7a73286afaaf6be99251eb9498baefa7d406892f67b879adb3a1d7e687fc4ccc1a388c7175fbaae567a26ab44d1067b54fcb0d6a316"
+}
