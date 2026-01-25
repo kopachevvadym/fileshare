@@ -12,3 +12,5 @@ yarn-error.log*
 
 /shared/
 /.next/
+*storybook.log
+storybook-static
