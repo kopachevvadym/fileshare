@@ -1,5 +1,9 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const sharedDir = path.join(__dirname, '../../shared');
 const messagesPath = path.join(sharedDir, 'messages.json');
@@ -8,7 +12,7 @@ function ensureSharedDir() {
     fs.mkdirSync(sharedDir, { recursive: true });
 }
 
-function safeReadMessages() {
+export function safeReadMessages() {
     ensureSharedDir();
 
     if (!fs.existsSync(messagesPath)) {
@@ -31,7 +35,7 @@ function writeMessages(messages) {
     fs.writeFileSync(messagesPath, JSON.stringify(messages, null, 2) + '\n', 'utf8');
 }
 
-function appendMessage({ text }) {
+export function appendMessage({ text }) {
     const trimmed = typeof text === 'string' ? text.trim() : '';
     if (!trimmed) {
         const err = new Error('Message text is required');
@@ -53,7 +57,7 @@ function appendMessage({ text }) {
     return entry;
 }
 
-function deleteMessageById(id) {
+export function deleteMessageById(id) {
     const numericId = Number(id);
     if (!Number.isFinite(numericId)) {
         const err = new Error('Invalid message id');
@@ -75,9 +79,4 @@ function deleteMessageById(id) {
     return removed;
 }
 
-module.exports = {
-    appendMessage,
-    safeReadMessages,
-    deleteMessageById,
-    messagesPath,
-};
+export { messagesPath };

@@ -1,9 +1,13 @@
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const sharedDir = path.join(__dirname, '../../shared');
 
-function isValidFilename(filename) {
+export function isValidFilename(filename) {
     if (!filename || typeof filename !== 'string') return false;
 
     // Disallow path separators and parent directory traversal
@@ -18,11 +22,11 @@ function isValidFilename(filename) {
     return true;
 }
 
-function listFiles() {
+export function listFiles() {
     return fs.readdirSync(sharedDir);
 }
 
-function getFilePath(filename) {
+export function getFilePath(filename) {
     if (!isValidFilename(filename)) {
         const err = new Error('Invalid filename');
         err.code = 'EINVAL_FILENAME';
@@ -44,7 +48,7 @@ function getFilePath(filename) {
     return filePath;
 }
 
-function deleteFile(filename) {
+export function deleteFile(filename) {
     const filePath = getFilePath(filename);
 
     if (!fs.existsSync(filePath)) {
@@ -56,9 +60,4 @@ function deleteFile(filename) {
     fs.unlinkSync(filePath);
 }
 
-module.exports = {
-    listFiles,
-    getFilePath,
-    deleteFile,
-    isValidFilename,
-};
+export { sharedDir };

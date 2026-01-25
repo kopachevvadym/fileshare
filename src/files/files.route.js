@@ -1,8 +1,13 @@
-const express = require('express');
+import express from 'express';
+import multer from 'multer';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { uploadFile, getFiles, downloadFile, deleteFile } from './files.controller.js';
+
 const router = express.Router();
-const { uploadFile, getFiles, downloadFile, deleteFile } = require('./files.controller');
-const multer = require('multer');
-const path = require('path');
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const storage = multer.diskStorage({
     destination: path.join(__dirname, '../../shared'),
@@ -16,4 +21,4 @@ router.get('/:filename', downloadFile);
 router.delete('/:filename', deleteFile);
 router.post('/upload', upload.array('file', 20), uploadFile);
 
-module.exports = router;
+export default router;

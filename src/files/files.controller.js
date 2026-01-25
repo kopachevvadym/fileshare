@@ -1,6 +1,6 @@
-const fileService = require('./files.service');
+import * as fileService from './files.service.js';
 
-function getFiles(req, res) {
+export function getFiles(req, res) {
     const files = fileService.listFiles();
 
     const fileUrls = files.map(file => ({
@@ -11,7 +11,7 @@ function getFiles(req, res) {
     res.json(fileUrls.filter(f => f.name !== 'messages.json'));
 }
 
-function downloadFile(req, res) {
+export function downloadFile(req, res) {
     try {
         const filePath = fileService.getFilePath(req.params.filename);
         res.download(filePath);
@@ -30,7 +30,7 @@ function downloadFile(req, res) {
     }
 }
 
-function uploadFile(req, res) {
+export function uploadFile(req, res) {
     const files = Array.isArray(req.files) ? req.files : (req.file ? [req.file] : []);
 
     if (files.length === 0) {
@@ -52,7 +52,7 @@ function uploadFile(req, res) {
     });
 }
 
-function deleteFile(req, res) {
+export function deleteFile(req, res) {
     const filename = decodeURIComponent(req.params.filename);
 
     try {
@@ -71,10 +71,3 @@ function deleteFile(req, res) {
         return res.status(500).json({ error: 'Failed to delete file' });
     }
 }
-
-module.exports = {
-    getFiles,
-    downloadFile,
-    uploadFile,
-    deleteFile,
-};

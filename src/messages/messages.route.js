@@ -1,5 +1,5 @@
-const express = require('express');
-const messageService = require('./messages.service');
+import express from 'express';
+import * as messageService from './messages.service.js';
 
 const router = express.Router();
 
@@ -53,4 +53,4 @@ router.post('/', (req, res) => {
     }
 });
 
-module.exports = router;
+export default router;
