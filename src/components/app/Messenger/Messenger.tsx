@@ -192,8 +192,8 @@ export function Messenger() {
 
   return (
     <div className="w-full flex flex-col gap-3">
-      <div className="py-2">
-        <div className="flex items-center gap-2">
+      <div className="pt-2">
+        <div className="sticky top-2 flex items-center gap-2">
           <strong className="text-slate-900 dark:text-slate-100">Messages</strong>
 
           <button
@@ -213,7 +213,7 @@ export function Messenger() {
         {messages.length === 0 && !isLoadingMessages ? (
           <div className="text-slate-500 pt-2 text-sm">No messages yet.</div>
         ) : (
-          <div className="pt-2 flex flex-col gap-2">
+          <div className="pt-2 gap-2 flex flex-col overflow-y-auto h-full">
             {messages.map((m) => {
               const key = messageKey(m);
               const recentlyCopied = copyStatus?.id === key && copyStatus?.ok;
@@ -236,7 +236,6 @@ export function Messenger() {
                       className="flex-1 min-w-0 text-left"
                     >
                       <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{m?.text ?? ''}</div>
-
                       {m?.createdAt && <div className="mt-1 text-xs text-slate-500">{m.createdAt}</div>}
                     </button>
 
@@ -256,7 +255,9 @@ export function Messenger() {
         )}
       </div>
 
-      <ChatInput onSend={handleSendMessage}/>
+      <div className="sticky bottom-2 z-10 border-t border-slate-200 dark:border-white/0 py-2">
+        <ChatInput onSend={handleSendMessage} />
+      </div>
     </div>
   );
 }
