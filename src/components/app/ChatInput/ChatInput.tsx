@@ -1,3 +1,4 @@
+'use client';
 import { useEffect, useRef, useState } from 'react';
 
 
@@ -90,7 +91,6 @@ export function ChatInput({ onSend }: ChatInputProps) {
     // APPEND (do not reset) + DEDUPE by key + LIMIT to MAX_FILES
     setSelectedFiles((prev) => {
       if (prev.length >= MAX_FILES) {
-        // cleanup any created preview URLs to avoid leaks
         revokeAllPreviews(newEntries);
         return prev;
       }
@@ -110,7 +110,6 @@ export function ChatInput({ onSend }: ChatInputProps) {
           existingKeys.add(entry.key);
           remaining -= 1;
         } else {
-          // if duplicate, cleanup created preview URL to avoid leaks
           if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
         }
       }
@@ -124,8 +123,6 @@ export function ChatInput({ onSend }: ChatInputProps) {
       return [...prev, ...filtered];
     });
 
-    // keep text untouched; input is disabled while files exist (your current behavior)
-    // allow choosing the same files again later
     e.currentTarget.value = '';
   };
 
@@ -153,56 +150,60 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
   const label =
     selectedFiles.length > 0
-      ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected${selectedFiles.length >= MAX_FILES ? ' (max)' : ''}`
+      ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected${
+        selectedFiles.length >= MAX_FILES ? ' (max)' : ''
+      }`
       : text;
 
+  const canAttachMore = selectedFiles.length < MAX_FILES;
+
   return (
-    <div className="chat-input-container">
+    <div className="w-full">
       {selectedFiles.length > 0 && (
-        <div className="file-previews">
+        <div className="flex gap-2 px-2 pt-2 overflow-x-auto">
           {selectedFiles.map(({ id, file, previewUrl }) => (
-            <div className="file-tile" key={id} title={file.name}>
+            <div
+              key={id}
+              title={file.name}
+              className="relative h-24 w-24 flex-none overflow-hidden rounded-xl border border-black/10 bg-white"
+            >
               {previewUrl ? (
-                <img className="file-thumb" src={previewUrl} alt={file.name}/>
+                <img className="h-full w-full object-cover block" src={previewUrl} alt={file.name} />
               ) : (
-                <div className="file-generic">
-                  <div className="file-ext">
+                <div className="h-full w-full p-2 flex flex-col justify-between">
+                  <div className="text-[12px] font-bold opacity-75">
                     {(file.name.split('.').pop() || 'FILE').toUpperCase()}
                   </div>
-                  <div className="file-name">{file.name}</div>
+                  <div className="text-[11px] leading-[1.2] overflow-hidden text-ellipsis">
+                    {file.name}
+                  </div>
                 </div>
               )}
 
               <button
                 type="button"
-                className="file-remove-btn"
                 onClick={() => removeFile(id)}
                 aria-label={`Remove ${file.name}`}
+                className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white hover:bg-black/75"
               >
-                <i className="fa-solid fa-xmark"></i>
+                <i className="fa-solid fa-xmark" />
               </button>
             </div>
           ))}
         </div>
       )}
 
-      <div className="chat-input-wrapper">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          style={{ display: 'none' }}
-          onChange={handleFileChange}
-        />
+      <div className="w-full max-w-[720px] flex items-center gap-2 rounded-full bg-[#2f2f2f] px-2 py-2">
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
 
         <button
-          className="icon-btn left"
-          onClick={handleFileButton}
           type="button"
-          disabled={selectedFiles.length >= MAX_FILES}
-          title={selectedFiles.length >= MAX_FILES ? `Max ${MAX_FILES} files` : 'Attach files'}
+          onClick={handleFileButton}
+          disabled={!canAttachMore}
+          title={!canAttachMore ? `Max ${MAX_FILES} files` : 'Attach files'}
+          className="grid h-7 w-7 place-items-center rounded-full text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <i className="fa-solid fa-paperclip"></i>
+          <i className="fa-solid fa-paperclip" />
         </button>
 
         <input
@@ -217,16 +218,27 @@ export function ChatInput({ onSend }: ChatInputProps) {
               handleSend();
             }
           }}
+          className="flex-1 bg-transparent outline-none border-none text-white text-[16px] placeholder:text-[#9a9a9a] disabled:cursor-not-allowed disabled:opacity-80"
         />
 
         {selectedFiles.length > 0 && (
-          <button className="icon-btn" onClick={resetFiles} type="button" title="Clear all files">
-            <i className="fa-solid fa-xmark"></i>
+          <button
+            type="button"
+            onClick={resetFiles}
+            title="Clear all files"
+            className="grid h-7 w-7 place-items-center rounded-full text-white hover:bg-white/10"
+          >
+            <i className="fa-solid fa-xmark" />
           </button>
         )}
 
-        <button className="icon-btn right" onClick={handleSend} type="button">
-          <i className="fa-solid fa-paper-plane"></i>
+        <button
+          type="button"
+          onClick={handleSend}
+          title="Send"
+          className="grid h-7 w-7 place-items-center rounded-full bg-white text-black hover:bg-[#e5e5e5]"
+        >
+          <i className="fa-solid fa-paper-plane" />
         </button>
       </div>
     </div>
