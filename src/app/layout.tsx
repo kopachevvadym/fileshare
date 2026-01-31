@@ -16,7 +16,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode; }) {
   return (
-    <html lang="en" className="h-full">
+    <html lang="en" className="h-full dark" data-theme="dark">
     <head>
       <title>FileShare</title>
       <meta charSet="UTF-8"/>

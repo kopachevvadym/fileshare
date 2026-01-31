@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "./theme.css";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Reset / base */
 html,
 body {
