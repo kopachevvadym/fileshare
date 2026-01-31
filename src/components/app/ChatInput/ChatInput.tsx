@@ -10,7 +10,7 @@ export type ChatSendPayload =
   | { files: File[]; text?: never };
 
 export interface ChatInputProps {
-  onSend?: (payload: ChatSendPayload) => void;
+  onSend?: (payload: ChatSendPayload) => void | Promise<void>;
 }
 
 type SelectedFileEntry = {
@@ -67,9 +67,7 @@ const FilePreviews = React.memo(function FilePreviews({
               <div className="text-[12px] font-bold opacity-75">
                 {(file.name.split('.').pop() || 'FILE').toUpperCase()}
               </div>
-              <div className="text-[11px] leading-[1.2] overflow-hidden text-ellipsis">
-                {file.name}
-              </div>
+              <div className="text-[11px] leading-[1.2] overflow-hidden text-ellipsis">{file.name}</div>
             </div>
           )}
 
@@ -90,7 +88,12 @@ const FilePreviews = React.memo(function FilePreviews({
 export function ChatInput({ onSend }: ChatInputProps) {
   const [text, setText] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFileEntry[]>([]);
+  const [isSending, setIsSending] = useState(false);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Send lock: prevents double-send from Enter + click, or rapid taps
+  const sendingRef = useRef(false);
 
   // Keep latest selectedFiles for unmount cleanup without extra effects/rerenders
   const selectedFilesRef = useRef<SelectedFileEntry[]>([]);
@@ -104,40 +107,60 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
   const canAttachMore = selectedFiles.length < MAX_FILES;
 
-  const label = useMemo(() => {
-    return selectedFiles.length > 0
-      ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected${
-        selectedFiles.length >= MAX_FILES ? ' (max)' : ''
-      }`
-      : text;
+  const filesLabel = useMemo(() => {
+    if (selectedFiles.length === 0) return null;
+    return `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected${
+      selectedFiles.length >= MAX_FILES ? ' (max)' : ''
+    }`;
+  }, [selectedFiles.length]);
+
+  const hasSomethingToSend = useMemo(() => {
+    if (selectedFiles.length > 0) return true;
+    return text.trim().length > 0;
   }, [selectedFiles.length, text]);
 
-  const handleSend = useCallback((): void => {
-    if (selectedFilesRef.current.length > 0) {
-      const files = selectedFilesRef.current.map((x) => x.file);
-      onSend?.({ files });
+  const handleSend = useCallback(async (): Promise<void> => {
+    if (!onSend) return;
+    if (sendingRef.current) return; // ✅ hard lock
+    if (!hasSomethingToSend) return;
 
-      revokeAllPreviews(selectedFilesRef.current);
-      setSelectedFiles([]);
+    sendingRef.current = true;
+    setIsSending(true);
+
+    try {
+      if (selectedFilesRef.current.length > 0) {
+        const files = selectedFilesRef.current.map((x) => x.file);
+
+        await onSend({ files });
+
+        revokeAllPreviews(selectedFilesRef.current);
+        setSelectedFiles([]);
+        setText('');
+        return;
+      }
+
+      const trimmed = text.trim();
+      if (!trimmed) return;
+
+      await onSend({ text: trimmed });
       setText('');
-      return;
+    } finally {
+      // small microtask gap prevents Enter+click in same frame from re-entering
+      queueMicrotask(() => {
+        sendingRef.current = false;
+      });
+      setIsSending(false);
     }
-
-    setText((prev) => {
-      const trimmed = prev.trim();
-      if (!trimmed) return prev; // keep as-is if empty/whitespace
-      onSend?.({ text: trimmed });
-      return '';
-    });
-  }, [onSend]);
+  }, [onSend, hasSomethingToSend, text]);
 
   const handleFileButton = useCallback((): void => {
+    if (isSending) return;
     if (selectedFilesRef.current.length >= MAX_FILES) {
       alert(`Maximum of ${MAX_FILES} files can be attached.`);
       return;
     }
     fileInputRef.current?.click();
-  }, []);
+  }, [isSending]);
 
   const handleFileChange = useCallback<React.ChangeEventHandler<HTMLInputElement>>((e) => {
     const files = Array.from(e.currentTarget.files ?? []);
@@ -188,20 +211,23 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
   const handleInputChange = useCallback<React.ChangeEventHandler<HTMLInputElement>>(
     (e) => {
-      // If user starts typing, treat that as switching back to text mode
+      if (isSending) return;
+
+      // If user starts typing, switch back to text mode
       if (selectedFilesRef.current.length > 0) {
         revokeAllPreviews(selectedFilesRef.current);
         setSelectedFiles([]);
       }
       setText(e.currentTarget.value);
     },
-    [],
+    [isSending],
   );
 
   const resetFiles = useCallback((): void => {
+    if (isSending) return;
     revokeAllPreviews(selectedFilesRef.current);
     setSelectedFiles([]);
-  }, []);
+  }, [isSending]);
 
   const removeFile = useCallback((id: string): void => {
     setSelectedFiles((prev) => {
@@ -214,7 +240,10 @@ export function ChatInput({ onSend }: ChatInputProps) {
   const onKeyDown = useCallback<React.KeyboardEventHandler<HTMLInputElement>>(
     (e) => {
       const native = e.nativeEvent as unknown as { isComposing?: boolean };
-      if (e.key === 'Enter' && !native.isComposing) handleSend();
+      if (e.key === 'Enter' && !native.isComposing) {
+        e.preventDefault(); // ✅ prevent accidental double actions
+        void handleSend();
+      }
     },
     [handleSend],
   );
@@ -223,19 +252,16 @@ export function ChatInput({ onSend }: ChatInputProps) {
     <div className="w-full">
       <FilePreviews files={selectedFiles} onRemove={removeFile}/>
 
+      {/* Optional files label row */}
+      {filesLabel && <div className="px-3 pt-2 text-xs text-white/70">{filesLabel}</div>}
+
       <div className="w-full flex items-center gap-2 rounded-full bg-[#2f2f2f] px-2 py-2">
-        <input
-          ref={fileInputRef}
-          type="file"
-          multiple
-          className="hidden"
-          onChange={handleFileChange}
-        />
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange}/>
 
         <button
           type="button"
           onClick={handleFileButton}
-          disabled={!canAttachMore}
+          disabled={!canAttachMore || isSending}
           title={!canAttachMore ? `Max ${MAX_FILES} files` : 'Attach files'}
           className="grid h-7 w-7 place-items-center rounded-full text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
         >
@@ -245,8 +271,8 @@ export function ChatInput({ onSend }: ChatInputProps) {
         <input
           type="text"
           placeholder="Ask anything"
-          value={label}
-          disabled={selectedFiles.length > 0}
+          value={text} // ✅ controlled by text only
+          disabled={selectedFiles.length > 0 || isSending}
           onChange={handleInputChange}
           onKeyDown={onKeyDown}
           className="flex-1 bg-transparent outline-none border-none text-white text-[16px] placeholder:text-[#9a9a9a] disabled:cursor-not-allowed disabled:opacity-80"
@@ -256,8 +282,9 @@ export function ChatInput({ onSend }: ChatInputProps) {
           <button
             type="button"
             onClick={resetFiles}
+            disabled={isSending}
             title="Clear all files"
-            className="grid h-7 w-7 place-items-center rounded-full text-white hover:bg-white/10"
+            className="grid h-7 w-7 place-items-center rounded-full text-white hover:bg-white/10 disabled:opacity-40"
           >
             <FontAwesomeIcon icon={faXmark}/>
           </button>
@@ -265,9 +292,10 @@ export function ChatInput({ onSend }: ChatInputProps) {
 
         <button
           type="button"
-          onClick={handleSend}
+          onClick={() => void handleSend()}
+          disabled={!hasSomethingToSend || isSending}
           title="Send"
-          className="grid h-7 w-7 place-items-center rounded-full bg-white text-black hover:bg-[#e5e5e5]"
+          className="grid h-7 w-7 place-items-center rounded-full bg-white text-black hover:bg-[#e5e5e5] disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <FontAwesomeIcon icon={faPaperPlane}/>
         </button>
