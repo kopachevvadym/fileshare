@@ -194,17 +194,6 @@ export function Messenger() {
     <div className="w-full flex flex-col gap-3">
       <div className="pt-2">
         <div className="sticky top-2 flex items-center gap-2">
-          <strong className="text-slate-900 dark:text-slate-100">Messages</strong>
-
-          <button
-            type="button"
-            onClick={fetchMessages}
-            title="Refresh messages"
-            className="grid h-8 w-8 place-items-center rounded-full text-slate-700 hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-white/10"
-          >
-            <FontAwesomeIcon icon={faArrowsRotate}/>
-          </button>
-
           {isLoadingMessages && <span className="text-slate-500 text-sm">Loading…</span>}
 
           {copyStatus && <span className={`ml-2 text-xs ${statusClass}`}>{statusText}</span>}
