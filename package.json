@@ -45,6 +45,7 @@
     "vitest": "^4.0.18"
   },
   "dependencies": {
+    "@storybook/react": "^10.2.3",
     "@tailwindcss/postcss": "^4.1.18",
     "express": "^5.1.0",
     "multer": "^2.0.1",
