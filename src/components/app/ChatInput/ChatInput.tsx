@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperclip, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { Image } from 'next/dist/client/image-component';
 
 
 export type ChatSendPayload =
@@ -170,7 +171,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
               className="relative h-24 w-24 flex-none overflow-hidden rounded-xl border border-black/10 bg-white"
             >
               {previewUrl ? (
-                <img className="h-full w-full object-cover block" src={previewUrl} alt={file.name}/>
+                <Image className="h-full w-full object-cover block" src={previewUrl} alt={file.name}/>
               ) : (
                 <div className="h-full w-full p-2 flex flex-col justify-between">
                   <div className="text-[12px] font-bold opacity-75">
@@ -195,7 +196,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
         </div>
       )}
 
-      <div className="w-full max-w-[720px] flex items-center gap-2 rounded-full bg-[#2f2f2f] px-2 py-2">
+      <div className="w-full flex items-center gap-2 rounded-full bg-[#2f2f2f] px-2 py-2">
         <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange}/>
 
         <button
