@@ -222,7 +222,7 @@ export function Messenger() {
                 <div
                   key={key}
                   className={[
-                    'w-full rounded-lg border px-3 py-2 transition',
+                    'group w-full rounded-lg border px-3 py-2 transition',
                     'border-slate-200 bg-white hover:bg-slate-50',
                     'dark:border-white/10 dark:bg-slate-900 dark:hover:bg-white/5',
                     recentlyCopied ? 'ring-1 ring-emerald-400/60 bg-emerald-50 dark:bg-emerald-950/30' : '',
@@ -244,9 +244,9 @@ export function Messenger() {
                       type="button"
                       onClick={(e) => handleDeleteMessage(m, e)}
                       title="Delete message"
-                      className="grid h-8 w-8 flex-none place-items-center rounded-full text-red-600 hover:bg-red-50 dark:hover:bg-red-500/10"
+                      className="grid h-8 w-8 flex-none place-items-center rounded-full text-red-600 opacity-100 transition-opacity hover:bg-red-50 dark:hover:bg-red-500/10 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
                     >
-                      <FontAwesomeIcon icon={faXmark}/>
+                      <FontAwesomeIcon icon={faXmark} />
                     </button>
                   </div>
                 </div>
