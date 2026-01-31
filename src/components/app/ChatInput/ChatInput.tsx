@@ -1,5 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faPaperclip, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
 
 
 export type ChatSendPayload =
@@ -168,7 +170,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
               className="relative h-24 w-24 flex-none overflow-hidden rounded-xl border border-black/10 bg-white"
             >
               {previewUrl ? (
-                <img className="h-full w-full object-cover block" src={previewUrl} alt={file.name} />
+                <img className="h-full w-full object-cover block" src={previewUrl} alt={file.name}/>
               ) : (
                 <div className="h-full w-full p-2 flex flex-col justify-between">
                   <div className="text-[12px] font-bold opacity-75">
@@ -186,7 +188,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
                 aria-label={`Remove ${file.name}`}
                 className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white hover:bg-black/75"
               >
-                <i className="fa-solid fa-xmark" />
+                <FontAwesomeIcon icon={faXmark}/>
               </button>
             </div>
           ))}
@@ -194,7 +196,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
       )}
 
       <div className="w-full max-w-[720px] flex items-center gap-2 rounded-full bg-[#2f2f2f] px-2 py-2">
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange} />
+        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange}/>
 
         <button
           type="button"
@@ -203,7 +205,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
           title={!canAttachMore ? `Max ${MAX_FILES} files` : 'Attach files'}
           className="grid h-7 w-7 place-items-center rounded-full text-white hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
         >
-          <i className="fa-solid fa-paperclip" />
+          <FontAwesomeIcon icon={faPaperclip}/>
         </button>
 
         <input
@@ -228,7 +230,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
             title="Clear all files"
             className="grid h-7 w-7 place-items-center rounded-full text-white hover:bg-white/10"
           >
-            <i className="fa-solid fa-xmark" />
+            <FontAwesomeIcon icon={faXmark}/>
           </button>
         )}
 
@@ -238,7 +240,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
           title="Send"
           className="grid h-7 w-7 place-items-center rounded-full bg-white text-black hover:bg-[#e5e5e5]"
         >
-          <i className="fa-solid fa-paper-plane" />
+          <FontAwesomeIcon icon={faPaperPlane}/>
         </button>
       </div>
     </div>
