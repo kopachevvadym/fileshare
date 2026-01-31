@@ -191,7 +191,7 @@ export function Messenger() {
   }, [copyStatus]);
 
   return (
-    <div className="w-full max-w-[720px] flex flex-col gap-3">
+    <div className="w-full flex flex-col gap-3">
       <div className="py-2">
         <div className="flex items-center gap-2">
           <strong className="text-slate-900 dark:text-slate-100">Messages</strong>
@@ -219,28 +219,26 @@ export function Messenger() {
               const recentlyCopied = copyStatus?.id === key && copyStatus?.ok;
 
               return (
-                <button
+                <div
                   key={key}
-                  type="button"
-                  onClick={() => handleMessageClick(m)}
-                  title="Click to copy"
                   className={[
-                    'w-full text-left rounded-lg border px-3 py-2 transition',
+                    'w-full rounded-lg border px-3 py-2 transition',
                     'border-slate-200 bg-white hover:bg-slate-50',
                     'dark:border-white/10 dark:bg-slate-900 dark:hover:bg-white/5',
                     recentlyCopied ? 'ring-1 ring-emerald-400/60 bg-emerald-50 dark:bg-emerald-950/30' : '',
                   ].join(' ')}
                 >
                   <div className="flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">
-                        {m?.text ?? ''}
-                      </div>
+                    <button
+                      type="button"
+                      onClick={() => handleMessageClick(m)}
+                      title="Click to copy"
+                      className="flex-1 min-w-0 text-left"
+                    >
+                      <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{m?.text ?? ''}</div>
 
-                      {m?.createdAt && (
-                        <div className="mt-1 text-xs text-slate-500">{m.createdAt}</div>
-                      )}
-                    </div>
+                      {m?.createdAt && <div className="mt-1 text-xs text-slate-500">{m.createdAt}</div>}
+                    </button>
 
                     <button
                       type="button"
@@ -251,7 +249,7 @@ export function Messenger() {
                       <FontAwesomeIcon icon={faXmark}/>
                     </button>
                   </div>
-                </button>
+                </div>
               );
             })}
           </div>
