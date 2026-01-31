@@ -1,9 +1,9 @@
 'use client';
-import { useEffect, useRef, useState } from 'react';
+
+import Image from 'next/image';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperclip, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
-import Image from 'next/image';
-
 
 export type ChatSendPayload =
   | { text: string; files?: never }
@@ -20,67 +20,126 @@ type SelectedFileEntry = {
   previewUrl: string | null;
 };
 
-export function ChatInput({ onSend }: ChatInputProps) {
-  const MAX_FILES = 20;
+const MAX_FILES = 20;
 
-  const [text, setText] = useState<string>('');
+function isImageFile(file: File): boolean {
+  return file.type?.startsWith('image/') ?? false;
+}
+
+function makeId(file: File): string {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(16).slice(2)}`;
+}
+
+function fileKey(file: File): string {
+  return `${file.name}__${file.size}__${file.lastModified}`;
+}
+
+function revokeAllPreviews(entries: SelectedFileEntry[]): void {
+  entries.forEach((x) => {
+    if (x.previewUrl) URL.revokeObjectURL(x.previewUrl);
+  });
+}
+
+/** Memoized preview strip: does NOT rerender when typing */
+const FilePreviews = React.memo(function FilePreviews({
+                                                        files,
+                                                        onRemove,
+                                                      }: {
+  files: SelectedFileEntry[];
+  onRemove: (id: string) => void;
+}) {
+  if (files.length === 0) return null;
+
+  return (
+    <div className="flex gap-2 px-2 pt-2 overflow-x-auto">
+      {files.map(({ id, file, previewUrl }) => (
+        <div
+          key={id}
+          title={file.name}
+          className="relative h-24 w-24 flex-none overflow-hidden rounded-xl border border-black/10 bg-white"
+        >
+          {previewUrl ? (
+            <Image className="object-cover" src={previewUrl} alt={file.name} fill sizes="96px"/>
+          ) : (
+            <div className="h-full w-full p-2 flex flex-col justify-between">
+              <div className="text-[12px] font-bold opacity-75">
+                {(file.name.split('.').pop() || 'FILE').toUpperCase()}
+              </div>
+              <div className="text-[11px] leading-[1.2] overflow-hidden text-ellipsis">
+                {file.name}
+              </div>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={() => onRemove(id)}
+            aria-label={`Remove ${file.name}`}
+            className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white hover:bg-black/75"
+          >
+            <FontAwesomeIcon icon={faXmark}/>
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+});
+
+export function ChatInput({ onSend }: ChatInputProps) {
+  const [text, setText] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<SelectedFileEntry[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const isImageFile = (file: File): boolean => file.type?.startsWith('image/') ?? false;
-
-  const makeId = (file: File): string =>
-    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(16).slice(2)}`;
-
-  const fileKey = (file: File): string => `${file.name}__${file.size}__${file.lastModified}`;
-
-  const revokeAllPreviews = (entries: SelectedFileEntry[]): void => {
-    entries.forEach((x) => {
-      if (x.previewUrl) URL.revokeObjectURL(x.previewUrl);
-    });
-  };
-
-  // Prevent object-URL leaks if the user navigates away with previews still allocated.
-  // Use a ref so unmount cleanup always sees the latest entries.
+  // Keep latest selectedFiles for unmount cleanup without extra effects/rerenders
   const selectedFilesRef = useRef<SelectedFileEntry[]>([]);
   useEffect(() => {
     selectedFilesRef.current = selectedFiles;
   }, [selectedFiles]);
 
   useEffect(() => {
-    return () => {
-      revokeAllPreviews(selectedFilesRef.current);
-    };
+    return () => revokeAllPreviews(selectedFilesRef.current);
   }, []);
 
-  const handleSend = (): void => {
-    if (selectedFiles.length > 0) {
-      onSend?.({ files: selectedFiles.map((x) => x.file) });
+  const canAttachMore = selectedFiles.length < MAX_FILES;
 
-      revokeAllPreviews(selectedFiles);
+  const label = useMemo(() => {
+    return selectedFiles.length > 0
+      ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected${
+        selectedFiles.length >= MAX_FILES ? ' (max)' : ''
+      }`
+      : text;
+  }, [selectedFiles.length, text]);
+
+  const handleSend = useCallback((): void => {
+    if (selectedFilesRef.current.length > 0) {
+      const files = selectedFilesRef.current.map((x) => x.file);
+      onSend?.({ files });
+
+      revokeAllPreviews(selectedFilesRef.current);
       setSelectedFiles([]);
       setText('');
       return;
     }
 
-    const trimmed = text.trim();
-    if (!trimmed) return;
+    setText((prev) => {
+      const trimmed = prev.trim();
+      if (!trimmed) return prev; // keep as-is if empty/whitespace
+      onSend?.({ text: trimmed });
+      return '';
+    });
+  }, [onSend]);
 
-    onSend?.({ text: trimmed });
-    setText('');
-  };
-
-  const handleFileButton = (): void => {
-    if (selectedFiles.length >= MAX_FILES) {
+  const handleFileButton = useCallback((): void => {
+    if (selectedFilesRef.current.length >= MAX_FILES) {
       alert(`Maximum of ${MAX_FILES} files can be attached.`);
       return;
     }
     fileInputRef.current?.click();
-  };
+  }, []);
 
-  const handleFileChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+  const handleFileChange = useCallback<React.ChangeEventHandler<HTMLInputElement>>((e) => {
     const files = Array.from(e.currentTarget.files ?? []);
     if (files.length === 0) return;
 
@@ -91,7 +150,6 @@ export function ChatInput({ onSend }: ChatInputProps) {
       previewUrl: isImageFile(file) ? URL.createObjectURL(file) : null,
     }));
 
-    // APPEND (do not reset) + DEDUPE by key + LIMIT to MAX_FILES
     setSelectedFiles((prev) => {
       if (prev.length >= MAX_FILES) {
         revokeAllPreviews(newEntries);
@@ -107,7 +165,6 @@ export function ChatInput({ onSend }: ChatInputProps) {
           if (entry.previewUrl) URL.revokeObjectURL(entry.previewUrl);
           continue;
         }
-
         if (!existingKeys.has(entry.key)) {
           filtered.push(entry);
           existingKeys.add(entry.key);
@@ -127,83 +184,53 @@ export function ChatInput({ onSend }: ChatInputProps) {
     });
 
     e.currentTarget.value = '';
-  };
+  }, []);
 
-  const handleInputChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
-    // If user starts typing, treat that as switching back to text mode
-    if (selectedFiles.length > 0) {
-      revokeAllPreviews(selectedFiles);
-      setSelectedFiles([]);
-    }
-    setText(e.currentTarget.value);
-  };
+  const handleInputChange = useCallback<React.ChangeEventHandler<HTMLInputElement>>(
+    (e) => {
+      // If user starts typing, treat that as switching back to text mode
+      if (selectedFilesRef.current.length > 0) {
+        revokeAllPreviews(selectedFilesRef.current);
+        setSelectedFiles([]);
+      }
+      setText(e.currentTarget.value);
+    },
+    [],
+  );
 
-  const resetFiles = (): void => {
-    revokeAllPreviews(selectedFiles);
+  const resetFiles = useCallback((): void => {
+    revokeAllPreviews(selectedFilesRef.current);
     setSelectedFiles([]);
-  };
+  }, []);
 
-  const removeFile = (id: string): void => {
+  const removeFile = useCallback((id: string): void => {
     setSelectedFiles((prev) => {
       const removed = prev.find((x) => x.id === id);
       if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl);
       return prev.filter((x) => x.id !== id);
     });
-  };
+  }, []);
 
-  const label =
-    selectedFiles.length > 0
-      ? `${selectedFiles.length} file${selectedFiles.length > 1 ? 's' : ''} selected${
-        selectedFiles.length >= MAX_FILES ? ' (max)' : ''
-      }`
-      : text;
-
-  const canAttachMore = selectedFiles.length < MAX_FILES;
+  const onKeyDown = useCallback<React.KeyboardEventHandler<HTMLInputElement>>(
+    (e) => {
+      const native = e.nativeEvent as unknown as { isComposing?: boolean };
+      if (e.key === 'Enter' && !native.isComposing) handleSend();
+    },
+    [handleSend],
+  );
 
   return (
     <div className="w-full">
-      {selectedFiles.length > 0 && (
-        <div className="flex gap-2 px-2 pt-2 overflow-x-auto">
-          {selectedFiles.map(({ id, file, previewUrl }) => (
-            <div
-              key={id}
-              title={file.name}
-              className="relative h-24 w-24 flex-none overflow-hidden rounded-xl border border-black/10 bg-white"
-            >
-              {previewUrl ? (
-                <Image
-                  className="object-cover"
-                  src={previewUrl}
-                  alt={file.name}
-                  fill
-                  sizes="96px"
-                />
-              ) : (
-                <div className="h-full w-full p-2 flex flex-col justify-between">
-                  <div className="text-[12px] font-bold opacity-75">
-                    {(file.name.split('.').pop() || 'FILE').toUpperCase()}
-                  </div>
-                  <div className="text-[11px] leading-[1.2] overflow-hidden text-ellipsis">
-                    {file.name}
-                  </div>
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => removeFile(id)}
-                aria-label={`Remove ${file.name}`}
-                className="absolute right-1.5 top-1.5 grid h-6 w-6 place-items-center rounded-full bg-black/55 text-white hover:bg-black/75"
-              >
-                <FontAwesomeIcon icon={faXmark}/>
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
+      <FilePreviews files={selectedFiles} onRemove={removeFile}/>
 
       <div className="w-full flex items-center gap-2 rounded-full bg-[#2f2f2f] px-2 py-2">
-        <input ref={fileInputRef} type="file" multiple className="hidden" onChange={handleFileChange}/>
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+        />
 
         <button
           type="button"
@@ -221,12 +248,7 @@ export function ChatInput({ onSend }: ChatInputProps) {
           value={label}
           disabled={selectedFiles.length > 0}
           onChange={handleInputChange}
-          onKeyDown={(e) => {
-            const native = e.nativeEvent as unknown as { isComposing?: boolean };
-            if (e.key === 'Enter' && !native.isComposing) {
-              handleSend();
-            }
-          }}
+          onKeyDown={onKeyDown}
           className="flex-1 bg-transparent outline-none border-none text-white text-[16px] placeholder:text-[#9a9a9a] disabled:cursor-not-allowed disabled:opacity-80"
         />
 
