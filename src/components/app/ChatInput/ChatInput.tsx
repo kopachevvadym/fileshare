@@ -2,7 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faPaperclip, faPaperPlane, faXmark } from '@fortawesome/free-solid-svg-icons';
-import { Image } from 'next/dist/client/image-component';
+import Image from 'next/image';
 
 
 export type ChatSendPayload =
@@ -171,7 +171,13 @@ export function ChatInput({ onSend }: ChatInputProps) {
               className="relative h-24 w-24 flex-none overflow-hidden rounded-xl border border-black/10 bg-white"
             >
               {previewUrl ? (
-                <Image className="h-full w-full object-cover block" src={previewUrl} alt={file.name}/>
+                <Image
+                  className="object-cover"
+                  src={previewUrl}
+                  alt={file.name}
+                  fill
+                  sizes="96px"
+                />
               ) : (
                 <div className="h-full w-full p-2 flex flex-col justify-between">
                   <div className="text-[12px] font-bold opacity-75">
