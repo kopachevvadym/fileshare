@@ -19,6 +19,10 @@ export interface AppendMessageInput {
   text?: unknown;
 }
 
+export interface UpdateMessageInput {
+  text?: unknown;
+}
+
 type ServiceErrorCode = 'EINVAL_TEXT' | 'EINVAL_ID' | 'ENOENT';
 
 interface ServiceError extends Error {
@@ -102,4 +106,41 @@ export function deleteMessageById(id: unknown): Message {
   writeMessages(messages);
 
   return removed;
+}
+
+export function updateMessageById(id: unknown, { text }: UpdateMessageInput): Message {
+  const numericId = Number(id);
+
+  if (!Number.isFinite(numericId)) {
+    const err: ServiceError = new Error('Invalid message id');
+    err.code = 'EINVAL_ID';
+    throw err;
+  }
+
+  const trimmed = typeof text === 'string' ? text.trim() : '';
+
+  if (!trimmed) {
+    const err: ServiceError = new Error('Message text is required');
+    err.code = 'EINVAL_TEXT';
+    throw err;
+  }
+
+  const messages = safeReadMessages();
+  const idx = messages.findIndex((m) => m.id === numericId);
+
+  if (idx === -1) {
+    const err: ServiceError = new Error('Message not found');
+    err.code = 'ENOENT';
+    throw err;
+  }
+
+  const updated: Message = {
+    ...messages[idx],
+    text: trimmed,
+  };
+
+  messages[idx] = updated;
+  writeMessages(messages);
+
+  return updated;
 }
