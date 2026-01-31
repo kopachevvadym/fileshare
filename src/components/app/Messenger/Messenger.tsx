@@ -224,7 +224,7 @@ export function Messenger() {
                   className={[
                     'group w-full rounded-lg border px-3 py-2 transition',
                     'border-slate-200 bg-white hover:bg-slate-50',
-                    'dark:border-white/10 dark:bg-slate-900 dark:hover:bg-white/5',
+                    'dark:border-white/10 dark:bg-zinc-800 dark:hover:bg-white/5',
                     recentlyCopied ? 'ring-1 ring-emerald-400/60 bg-emerald-50 dark:bg-emerald-950/30' : '',
                   ].join(' ')}
                 >
