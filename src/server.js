@@ -1,6 +1,5 @@
 import express from 'express';
 import fileRoutes from './files/files.route.js';
-import messageRoutes from './messages/messages.route.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
@@ -27,7 +26,6 @@ app.get('/', (req, res) => {
 
 // API routes
 app.use('/api/files', fileRoutes);
-app.use('/api/messages', messageRoutes);
 
 // Start server
 app.listen(PORT, () => {

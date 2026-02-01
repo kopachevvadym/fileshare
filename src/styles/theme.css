@@ -1,0 +1,22 @@
+:root {
+    /* Colors */
+    --color-bg: #ffffff;
+    --color-text: #111111;
+    --color-primary: #2563eb;
+    --color-danger: #dc2626;
+
+    /* Spacing */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 16px;
+    --space-lg: 24px;
+
+    /* Radius */
+    --radius-sm: 4px;
+    --radius-md: 8px;
+}
+
+[data-theme="dark"] {
+    --color-bg: #1e1e1e;
+    --color-text: #f5f5f5;
+}

@@ -11,3 +11,6 @@ yarn-error.log*
 /pnpm-lock.yaml
 
 /shared/
+/.next/
+*storybook.log
+storybook-static
