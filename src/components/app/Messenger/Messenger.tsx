@@ -318,7 +318,7 @@ export function Messenger() {
                       {isEditing ? (
                         <div className="flex flex-col gap-2">
                           <textarea
-                            className="w-full min-h-[72px] resize-y rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-zinc-900 dark:text-slate-100"
+                            className="w-full min-h-18 resize-y rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-zinc-900 dark:text-slate-100"
                             value={draftText}
                             onChange={(e) => setDraftText(e.target.value)}
                             onKeyDown={(e) => {
