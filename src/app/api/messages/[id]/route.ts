@@ -14,6 +14,20 @@ export async function DELETE(
     const { id } = await params;
     const removed = messageService.deleteMessageById(id);
 
+    // Cascade delete attached files (best-effort). If a file is already gone, ignore it.
+    if (removed && Array.isArray((removed as any).files)) {
+      for (const f of (removed as any).files as Array<{ filename?: unknown }>) {
+        if (f && typeof f === 'object' && 'filename' in f) {
+          try {
+            messageService.deleteSharedFile((f as any).filename);
+          } catch (err) {
+            // Don't fail message deletion if file deletion fails; just log.
+            console.warn('Failed to delete attached file:', (f as any).filename, err);
+          }
+        }
+      }
+    }
+
     return Response.json(
       { message: 'Message deleted', data: removed },
       { status: 200 },

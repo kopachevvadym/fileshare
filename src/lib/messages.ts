@@ -9,16 +9,31 @@ const sharedDir = path.join(__dirname, '../../shared');
 export const messagesPath = path.join(sharedDir, 'messages.json');
 
 
+export type MessageFile = {
+  originalName: string;
+  filename: string;
+  size: number;
+  mimetype: string;
+  url: string;
+};
+
 export interface Message {
   id: number;
   text: string;
   createdAt: string;
   /** Optional per-message note. Empty/undefined means no note. */
   note?: string;
+  /** Optional attachments uploaded alongside this message. */
+  files?: MessageFile[];
 }
 
 export interface AppendMessageInput {
   text?: unknown;
+}
+
+export interface AppendMessageWithFilesInput {
+  text?: unknown;
+  files: MessageFile[];
 }
 
 export interface UpdateMessageInput {
@@ -79,6 +94,30 @@ export function appendMessage({ text }: AppendMessageInput): Message {
     id: Date.now(),
     text: trimmed,
     createdAt: new Date().toISOString(),
+  };
+
+  messages.push(entry);
+  writeMessages(messages);
+
+  return entry;
+}
+
+export function appendMessageWithFiles({ text, files }: AppendMessageWithFilesInput): Message {
+  const trimmed = typeof text === 'string' ? text.trim() : '';
+
+  if (!Array.isArray(files) || files.length === 0) {
+    const err: ServiceError = new Error('At least one file is required');
+    err.code = 'EINVAL_TEXT';
+    throw err;
+  }
+
+  const messages = safeReadMessages();
+
+  const entry: Message = {
+    id: Date.now(),
+    text: trimmed || `Uploaded ${files.length} file${files.length === 1 ? '' : 's'}`,
+    createdAt: new Date().toISOString(),
+    files,
   };
 
   messages.push(entry);
@@ -178,4 +217,47 @@ export function updateMessageById(id: unknown, { text, note }: UpdateMessageInpu
   writeMessages(messages);
 
   return updated;
+}
+
+export function isValidSharedFilename(filename: unknown): boolean {
+  if (!filename || typeof filename !== 'string') return false;
+  if (filename.includes('/') || filename.includes('\\') || filename.includes('..')) return false;
+  if (filename.startsWith('.')) return false;
+  return filename.length <= 255;
+}
+
+export function getSharedFilePath(filename: unknown): string {
+  if (!isValidSharedFilename(filename)) {
+    const err: ServiceError = new Error('Invalid filename');
+    err.code = 'EINVAL_TEXT';
+    throw err;
+  }
+
+  const name = filename as string;
+  const filePath = path.join(sharedDir, name);
+
+  const normalizedShared = path.resolve(sharedDir) + path.sep;
+  const normalizedFile = path.resolve(filePath);
+  if (!normalizedFile.startsWith(normalizedShared)) {
+    const err: ServiceError = new Error('Invalid filename');
+    err.code = 'EINVAL_TEXT';
+    throw err;
+  }
+
+  return filePath;
+}
+
+/** Best-effort delete: ignores missing files. Throws for invalid filenames. */
+export function deleteSharedFile(filename: unknown): boolean {
+  const filePath = getSharedFilePath(filename);
+
+  try {
+    if (!fs.existsSync(filePath)) return false;
+    fs.unlinkSync(filePath);
+    return true;
+  } catch (err) {
+    // If it vanished concurrently, ignore.
+    if ((err as any)?.code === 'ENOENT') return false;
+    throw err;
+  }
 }

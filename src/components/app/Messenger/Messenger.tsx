@@ -3,13 +3,22 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ChatInput, type ChatSendPayload } from '@/components/app/ChatInput/ChatInput';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArrowsRotate, faFloppyDisk, faPenToSquare, faXmark } from '@fortawesome/free-solid-svg-icons';
+import { faArrowsRotate, faFloppyDisk, faPenToSquare, faXmark, faFile, faFileImage, faFilePdf, faFileLines, faFileZipper, faFileAudio, faFileVideo } from '@fortawesome/free-solid-svg-icons';
+
+type MessageFile = {
+  originalName: string;
+  filename: string;
+  size: number;
+  mimetype: string;
+  url: string;
+};
 
 type Message = {
   id?: string;
   text?: string;
   createdAt?: string;
   note?: string;
+  files?: MessageFile[];
 };
 
 type CopyStatus = {
@@ -131,8 +140,29 @@ export function Messenger() {
     }
   }, []);
 
+  const isFileMessage = useCallback((m: Message): boolean => {
+    return Array.isArray(m?.files) && m.files.length > 0;
+  }, []);
+
+  const openFileMessage = useCallback((m: Message): void => {
+    const file = Array.isArray(m?.files) ? m.files[0] : null;
+    const url = file?.url;
+
+    if (!url) {
+      alert('File URL missing');
+      return;
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }, []);
+
   const handleMessageClick = useCallback(
     async (m: Message) => {
+      if (isFileMessage(m)) {
+        openFileMessage(m);
+        return;
+      }
+
       const key = messageKey(m);
       const ok = await copyToClipboard(m?.text);
 
@@ -141,7 +171,7 @@ export function Messenger() {
       if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
       copyTimeoutRef.current = window.setTimeout(() => setCopyStatus(null), 1200);
     },
-    [copyToClipboard, messageKey],
+    [copyToClipboard, isFileMessage, messageKey, openFileMessage],
   );
 
   const handleSendMessage = useCallback(
@@ -152,9 +182,22 @@ export function Messenger() {
         const formData = new FormData();
         payload.files?.forEach((file) => formData.append('file', file));
 
-        const res = await fetch('/api/files/upload', { method: 'POST', body: formData });
-        const data = (await res.json().catch(() => null)) as unknown;
-        console.log('Files uploaded:', data);
+        const res = await fetch('/api/messages/upload', { method: 'POST', body: formData });
+        const data = (await res.json().catch(() => null)) as PostMessageResponse;
+
+        if (!res.ok) {
+          console.error('Files upload failed:', data);
+          return;
+        }
+
+        const saved = !Array.isArray(data) && data && typeof data === 'object' ? (data as any).data : null;
+
+        if (saved && (typeof saved.text === 'string' || Array.isArray((saved as any).files))) {
+          setMessages((prev) => [...prev, saved]);
+        } else {
+          fetchMessages();
+        }
+
         return;
       }
 
@@ -439,6 +482,7 @@ export function Messenger() {
               const recentlyCopied = copyStatus?.id === key && copyStatus?.ok;
               const isEditing = Boolean(editingId && m?.id && String(editingId) === String(m.id));
               const isNoteEditing = Boolean(noteEditingId && m?.id && String(noteEditingId) === String(m.id));
+              const isFile = isFileMessage(m);
 
               return (
                 <div
@@ -455,7 +499,13 @@ export function Messenger() {
                     <button
                       type="button"
                       onClick={() => !isEditing && !isNoteEditing && handleMessageClick(m)}
-                      title={isEditing || isNoteEditing ? undefined : 'Click to copy'}
+                      title={
+                        isEditing || isNoteEditing
+                          ? undefined
+                          : isFile
+                            ? 'Click to open'
+                            : 'Click to copy'
+                      }
                       className="flex-1 min-w-0 text-left"
                       disabled={isEditing || isNoteEditing}
                     >
@@ -495,7 +545,31 @@ export function Messenger() {
                         </div>
                       ) : (
                         <>
-                          <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{m?.text ?? ''}</div>
+                          {Array.isArray(m?.files) && m.files.length > 0 ? null : (
+                            <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{m?.text ?? ''}</div>
+                          )}
+
+                          {Array.isArray(m?.files) && m.files.length > 0 ? (
+                            <div className="mt-2 flex flex-col gap-1">
+                              {m.files.map((f) => (
+                                <a
+                                  key={f.filename}
+                                  href={f.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-xs text-blue-700 underline underline-offset-2 hover:text-blue-900 dark:text-blue-300 dark:hover:text-blue-200"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <span className="mr-2 inline-flex items-center gap-1.5 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[10px] font-semibold tracking-wide text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-slate-300">
+                                    <FontAwesomeIcon icon={fileTypeIcon(f).icon} className="text-[11px]" />
+                                    {fileTypeIcon(f).label}
+                                  </span>
+                                  {f.originalName || f.filename}
+                                </a>
+                              ))}
+                            </div>
+                          ) : null}
+
                           {(m?.note ?? '').trim() ? (
                             <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
                               <div className="whitespace-pre-wrap">{m.note}</div>
@@ -586,4 +660,43 @@ export function Messenger() {
       </div>
     </div>
   );
+}
+
+function guessExt(name: string): string {
+  const idx = name.lastIndexOf('.');
+  return idx >= 0 ? name.slice(idx + 1).toLowerCase() : '';
+}
+
+function fileTypeIcon(f: MessageFile) {
+  const mime = (f.mimetype || '').toLowerCase();
+  const ext = guessExt(f.originalName || f.filename);
+
+  if (mime.startsWith('image/') || ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg'].includes(ext)) {
+    return { icon: faFileImage, label: 'IMG' };
+  }
+
+  if (mime === 'application/pdf' || ext === 'pdf') {
+    return { icon: faFilePdf, label: 'PDF' };
+  }
+
+  if (
+    mime.startsWith('text/') ||
+    ['txt', 'md', 'log', 'csv', 'json', 'xml', 'yaml', 'yml', 'ts', 'tsx', 'js', 'jsx', 'css', 'html'].includes(ext)
+  ) {
+    return { icon: faFileLines, label: 'TXT' };
+  }
+
+  if (mime.includes('zip') || ['zip', 'rar', '7z', 'gz', 'tar'].includes(ext)) {
+    return { icon: faFileZipper, label: 'ZIP' };
+  }
+
+  if (mime.startsWith('audio/') || ['mp3', 'wav', 'm4a', 'ogg'].includes(ext)) {
+    return { icon: faFileAudio, label: 'AUD' };
+  }
+
+  if (mime.startsWith('video/') || ['mp4', 'mov', 'mkv', 'webm'].includes(ext)) {
+    return { icon: faFileVideo, label: 'VID' };
+  }
+
+  return { icon: faFile, label: 'FILE' };
 }
