@@ -9,6 +9,7 @@ type Message = {
   id?: string;
   text?: string;
   createdAt?: string;
+  note?: string;
 };
 
 type CopyStatus = {
@@ -31,7 +32,19 @@ export function Messenger() {
   const [draftText, setDraftText] = useState('');
   const [isSavingEdit, setIsSavingEdit] = useState(false);
 
+  const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
+  const [noteDraftText, setNoteDraftText] = useState('');
+  const [isSavingNote, setIsSavingNote] = useState(false);
+
+  const [contextMenu, setContextMenu] = useState<{
+    open: boolean;
+    x: number;
+    y: number;
+    message: Message | null;
+  }>({ open: false, x: 0, y: 0, message: null });
+
   const copyTimeoutRef = useRef<number | null>(null);
+  const contextCloseTimeoutRef = useRef<number | null>(null);
 
   const messageKey = useCallback((m: Message) => {
     return m?.id ?? `${m?.createdAt ?? ''}-${m?.text ?? ''}`;
@@ -65,8 +78,28 @@ export function Messenger() {
   useEffect(() => {
     return () => {
       if (copyTimeoutRef.current) window.clearTimeout(copyTimeoutRef.current);
+      if (contextCloseTimeoutRef.current) window.clearTimeout(contextCloseTimeoutRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    if (!contextMenu.open) return;
+
+    const onDoc = () => setContextMenu((s) => ({ ...s, open: false, message: null }));
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setContextMenu((s) => ({ ...s, open: false, message: null }));
+    };
+
+    document.addEventListener('click', onDoc);
+    document.addEventListener('contextmenu', onDoc);
+    document.addEventListener('keydown', onEsc);
+
+    return () => {
+      document.removeEventListener('click', onDoc);
+      document.removeEventListener('contextmenu', onDoc);
+      document.removeEventListener('keydown', onEsc);
+    };
+  }, [contextMenu.open]);
 
   const copyToClipboard = useCallback(async (text: unknown): Promise<boolean> => {
     const value = typeof text === 'string' ? text : '';
@@ -269,6 +302,95 @@ export function Messenger() {
     [draftText],
   );
 
+  const beginNoteEdit = useCallback((m: Message) => {
+    if (!m?.id) {
+      alert('Cannot add note: missing id');
+      return;
+    }
+    setNoteEditingId(String(m.id));
+    setNoteDraftText(m?.note ?? '');
+  }, []);
+
+  const cancelNoteEdit = useCallback(() => {
+    setNoteEditingId(null);
+    setNoteDraftText('');
+  }, []);
+
+  const saveNote = useCallback(
+    async (m: Message) => {
+      if (!m?.id) {
+        alert('Cannot add note: missing id');
+        return;
+      }
+
+      const trimmed = noteDraftText.trim();
+
+      setIsSavingNote(true);
+      try {
+        const res = await fetch(`/api/messages/${encodeURIComponent(String(m.id))}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ note: trimmed }),
+        });
+
+        const data = (await res.json().catch(() => null)) as { data?: Message; error?: string } | null;
+
+        if (!res.ok) {
+          console.error('Failed to update note:', data);
+          alert(data?.error || 'Failed to update note');
+          return;
+        }
+
+        const updated = data && typeof data === 'object' ? (data as any).data : null;
+
+        if (updated && String(updated?.id) === String(m.id)) {
+          setMessages((prev) =>
+            prev.map((x) => (String(x?.id) === String(m.id) ? { ...x, ...updated } : x)),
+          );
+        } else {
+          setMessages((prev) =>
+            prev.map((x) => {
+              if (String(x?.id) !== String(m.id)) return x;
+              if (!trimmed) {
+                const next = { ...x } as any;
+                delete next.note;
+                return next;
+              }
+              return { ...x, note: trimmed };
+            }),
+          );
+        }
+
+        setNoteEditingId(null);
+        setNoteDraftText('');
+      } catch (err) {
+        console.error('Failed to update note:', err);
+        alert('Failed to update note');
+      } finally {
+        setIsSavingNote(false);
+      }
+    },
+    [noteDraftText],
+  );
+
+  const openContextMenu = useCallback(
+    (e: React.MouseEvent, m: Message) => {
+      e.preventDefault();
+      e.stopPropagation();
+
+      const x = e.clientX;
+      const y = e.clientY;
+
+      setContextMenu({ open: true, x, y, message: m });
+
+      if (contextCloseTimeoutRef.current) window.clearTimeout(contextCloseTimeoutRef.current);
+      contextCloseTimeoutRef.current = window.setTimeout(() => {
+        setContextMenu((s) => ({ ...s, open: false, message: null }));
+      }, 6000);
+    },
+    [],
+  );
+
   const statusText = useMemo(() => {
     if (!copyStatus) return null;
     return copyStatus.ok ? 'Copied' : 'Copy failed';
@@ -288,6 +410,26 @@ export function Messenger() {
           {copyStatus && <span className={`ml-2 text-xs ${statusClass}`}>{statusText}</span>}
         </div>
 
+        {contextMenu.open && contextMenu.message ? (
+          <div
+            className="fixed z-50 min-w-44 rounded-md border border-slate-200 bg-white p-1 text-sm shadow-lg dark:border-white/10 dark:bg-zinc-900"
+            style={{ left: contextMenu.x, top: contextMenu.y }}
+            role="menu"
+          >
+            <button
+              type="button"
+              className="w-full rounded px-3 py-2 text-left hover:bg-slate-100 dark:hover:bg-white/10"
+              onClick={() => {
+                const msg = contextMenu.message!;
+                setContextMenu((s) => ({ ...s, open: false, message: null }));
+                beginNoteEdit(msg);
+              }}
+            >
+              {(contextMenu.message?.note ?? '').trim() ? 'Edit note' : 'Add note'}
+            </button>
+          </div>
+        ) : null}
+
         {messages.length === 0 && !isLoadingMessages ? (
           <div className="text-slate-500 pt-2 text-sm">No messages yet.</div>
         ) : (
@@ -296,10 +438,12 @@ export function Messenger() {
               const key = messageKey(m);
               const recentlyCopied = copyStatus?.id === key && copyStatus?.ok;
               const isEditing = Boolean(editingId && m?.id && String(editingId) === String(m.id));
+              const isNoteEditing = Boolean(noteEditingId && m?.id && String(noteEditingId) === String(m.id));
 
               return (
                 <div
                   key={key}
+                  onContextMenu={(e) => openContextMenu(e, m)}
                   className={[
                     'group w-full rounded-lg border px-3 py-2 transition',
                     'border-slate-200 bg-white hover:bg-slate-50',
@@ -310,10 +454,10 @@ export function Messenger() {
                   <div className="flex items-start gap-2">
                     <button
                       type="button"
-                      onClick={() => !isEditing && handleMessageClick(m)}
-                      title={isEditing ? undefined : 'Click to copy'}
+                      onClick={() => !isEditing && !isNoteEditing && handleMessageClick(m)}
+                      title={isEditing || isNoteEditing ? undefined : 'Click to copy'}
                       className="flex-1 min-w-0 text-left"
-                      disabled={isEditing}
+                      disabled={isEditing || isNoteEditing}
                     >
                       {isEditing ? (
                         <div className="flex flex-col gap-2">
@@ -330,13 +474,33 @@ export function Messenger() {
                               }
                             }}
                           />
-                          <div className="text-xs text-slate-500">
-                            Esc to cancel  Cmd/Ctrl+Enter to save
-                          </div>
+                          <div className="text-xs text-slate-500">Esc to cancel  Cmd/Ctrl+Enter to save</div>
+                        </div>
+                      ) : isNoteEditing ? (
+                        <div className="flex flex-col gap-2">
+                          <div className="text-xs text-slate-500">Note</div>
+                          <textarea
+                            className="w-full min-h-16 resize-y rounded-md border border-slate-200 bg-white px-2 py-1 text-slate-900 outline-none focus-visible:ring-2 focus-visible:ring-slate-300 dark:border-white/10 dark:bg-zinc-900 dark:text-slate-100"
+                            value={noteDraftText}
+                            placeholder="Type a note…"
+                            onChange={(e) => setNoteDraftText(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Escape') cancelNoteEdit();
+                              if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+                                void saveNote(m);
+                              }
+                            }}
+                          />
+                          <div className="text-xs text-slate-500">Esc to cancel  Cmd/Ctrl+Enter to save  (empty saves deletes note)</div>
                         </div>
                       ) : (
                         <>
                           <div className="whitespace-pre-wrap text-slate-900 dark:text-slate-100">{m?.text ?? ''}</div>
+                          {(m?.note ?? '').trim() ? (
+                            <div className="mt-2 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-700 dark:border-white/10 dark:bg-white/5 dark:text-slate-200">
+                              <div className="whitespace-pre-wrap">{m.note}</div>
+                            </div>
+                          ) : null}
                           {m?.createdAt && <div className="mt-1 text-xs text-slate-500">{m.createdAt}</div>}
                         </>
                       )}
@@ -360,6 +524,28 @@ export function Messenger() {
                             onClick={(e) => cancelEdit(e)}
                             title="Cancel"
                             disabled={isSavingEdit}
+                            className="grid h-8 w-8 flex-none place-items-center rounded-full text-slate-700 opacity-100 transition-opacity hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-white/10 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+                          >
+                            <FontAwesomeIcon icon={faXmark} />
+                          </button>
+                        </>
+                      ) : isNoteEditing ? (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => void saveNote(m)}
+                            title="Save note"
+                            disabled={isSavingNote}
+                            className="grid h-8 w-8 flex-none place-items-center rounded-full text-slate-700 opacity-100 transition-opacity hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-white/10 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
+                          >
+                            <FontAwesomeIcon icon={isSavingNote ? faArrowsRotate : faFloppyDisk} spin={isSavingNote} />
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => cancelNoteEdit()}
+                            title="Cancel"
+                            disabled={isSavingNote}
                             className="grid h-8 w-8 flex-none place-items-center rounded-full text-slate-700 opacity-100 transition-opacity hover:bg-slate-100 disabled:opacity-50 dark:text-slate-200 dark:hover:bg-white/10 lg:opacity-0 lg:group-hover:opacity-100 lg:focus-visible:opacity-100"
                           >
                             <FontAwesomeIcon icon={faXmark} />

@@ -13,6 +13,8 @@ export interface Message {
   id: number;
   text: string;
   createdAt: string;
+  /** Optional per-message note. Empty/undefined means no note. */
+  note?: string;
 }
 
 export interface AppendMessageInput {
@@ -21,6 +23,7 @@ export interface AppendMessageInput {
 
 export interface UpdateMessageInput {
   text?: unknown;
+  note?: unknown;
 }
 
 type ServiceErrorCode = 'EINVAL_TEXT' | 'EINVAL_ID' | 'ENOENT';
@@ -108,7 +111,7 @@ export function deleteMessageById(id: unknown): Message {
   return removed;
 }
 
-export function updateMessageById(id: unknown, { text }: UpdateMessageInput): Message {
+export function updateMessageById(id: unknown, { text, note }: UpdateMessageInput): Message {
   const numericId = Number(id);
 
   if (!Number.isFinite(numericId)) {
@@ -117,12 +120,38 @@ export function updateMessageById(id: unknown, { text }: UpdateMessageInput): Me
     throw err;
   }
 
-  const trimmed = typeof text === 'string' ? text.trim() : '';
+  const hasText = typeof text !== 'undefined';
+  const hasNote = typeof note !== 'undefined';
 
-  if (!trimmed) {
-    const err: ServiceError = new Error('Message text is required');
+  if (!hasText && !hasNote) {
+    const err: ServiceError = new Error('No fields to update');
+    // reuse existing 400 behavior in routes (treat as invalid text payload)
     err.code = 'EINVAL_TEXT';
     throw err;
+  }
+
+  let nextText: string | undefined;
+  if (hasText) {
+    const trimmed = typeof text === 'string' ? text.trim() : '';
+
+    if (!trimmed) {
+      const err: ServiceError = new Error('Message text is required');
+      err.code = 'EINVAL_TEXT';
+      throw err;
+    }
+
+    nextText = trimmed;
+  }
+
+  let nextNote: string | undefined;
+  let shouldUnsetNote = false;
+  if (hasNote) {
+    const trimmedNote = typeof note === 'string' ? note.trim() : '';
+    if (!trimmedNote) {
+      shouldUnsetNote = true;
+    } else {
+      nextNote = trimmedNote;
+    }
   }
 
   const messages = safeReadMessages();
@@ -136,8 +165,14 @@ export function updateMessageById(id: unknown, { text }: UpdateMessageInput): Me
 
   const updated: Message = {
     ...messages[idx],
-    text: trimmed,
+    ...(hasText ? { text: nextText! } : null),
+    ...(hasNote ? (shouldUnsetNote ? { note: undefined } : { note: nextNote }) : null),
   };
+
+  // Ensure we don't persist `note: undefined` in JSON output.
+  if (hasNote && shouldUnsetNote) {
+    delete (updated as any).note;
+  }
 
   messages[idx] = updated;
   writeMessages(messages);

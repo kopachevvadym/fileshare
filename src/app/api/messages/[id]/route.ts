@@ -47,7 +47,12 @@ export async function PATCH(
         ? (body as { text?: unknown }).text
         : undefined;
 
-    const updated = messageService.updateMessageById(id, { text });
+    const note =
+      typeof body === 'object' && body !== null && 'note' in body
+        ? (body as { note?: unknown }).note
+        : undefined;
+
+    const updated = messageService.updateMessageById(id, { text, note });
 
     return Response.json(
       { message: 'Message updated', data: updated },
